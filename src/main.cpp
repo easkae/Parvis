@@ -9,11 +9,11 @@
 #include <sstream>
 #include <stack>
 #include <algorithm>
+#include <cstdlib>
 
 extern "C" const TSLanguage* tree_sitter_cpp();
 
-std::string read_file(const std::string& path) 
-{
+std::string read_file(const std::string& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Failed to open file: " + path);
@@ -98,8 +98,8 @@ std::string get_fully_qualified_name(const TSNode& def_node, const std::string& 
                 scopes.push(get_base_name(ns_name_node, source));
             }
         } else if (type == "template_declaration") {
-		// TODO
-       }
+            // TODO
+        }
     }
 
     std::string fq_name;
@@ -197,10 +197,57 @@ void print_call_graph(const std::unordered_map<std::string, std::vector<std::str
     }
 }
 
+void generate_dot_file(const std::unordered_map<std::string, std::vector<std::string>>& call_graph, const std::string& dot_filename) {
+    std::ofstream dot_file(dot_filename);
+    if (!dot_file) {
+        std::cerr << "Error opening " << dot_filename << std::endl;
+        return;
+    }
+
+    dot_file << "digraph CallGraph {" << std::endl;
+    dot_file << "    node [shape=box, style=filled, fillcolor=lightblue];" << std::endl;
+
+    auto escape_dot_label = [](const std::string& label) -> std::string {
+        std::string escaped = label;
+        std::replace(escaped.begin(), escaped.end(), ':', '_');
+        std::replace(escaped.begin(), escaped.end(), '<', '_');
+        std::replace(escaped.begin(), escaped.end(), '>', '_');
+        std::replace(escaped.begin(), escaped.end(), ' ', '_');
+        return escaped;
+    };
+
+    for (const auto& [func, calls] : call_graph) {
+        std::string from = escape_dot_label(func);
+        for (const auto& call : calls) {
+            std::string to = escape_dot_label(call);
+            dot_file << "    \"" << from << "\" -> \"" << to << "\";" << std::endl;
+        }
+    }
+
+    dot_file << "}" << std::endl;
+    dot_file.close();
+    std::cout << "Generated DOT file: " << dot_filename << std::endl;
+}
+
+void render_graph(const std::string& dot_filename, const std::string& output_filename) {
+    std::string command = "dot -Tpng " + dot_filename + " -o " + output_filename;
+    int result = std::system(command.c_str());
+    if (result == 0) {
+        std::cout << "Rendered graph to: " << output_filename << std::endl;
+    } else {
+        std::cerr << "Error rendering graph. Make sure GraphViz is installed and 'dot' is in your PATH." << std::endl;
+    }
+}
+
 void build_and_print_call_graph(const std::string& path) {
     std::unordered_map<std::string, std::vector<std::string>> call_graph;
     traverse_directory(path, call_graph);
     print_call_graph(call_graph);
+
+    std::string dot_filename = "call_graph.dot";
+    std::string output_filename = "call_graph.png";
+    generate_dot_file(call_graph, dot_filename);
+    render_graph(dot_filename, output_filename);
 }
 
 int main(int argc, char* argv[]) {
