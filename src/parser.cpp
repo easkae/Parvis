@@ -1,20 +1,8 @@
 #include "parser.h"
-#include <tree_sitter/api.h>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-#include <filesystem>
-#include <sstream>
-#include <stack>
-#include <algorithm>
-#include <cstdlib>
 
-extern "C" const TSLanguage* tree_sitter_cpp();
-
-std::string read_file(const std::string& path) {
+std::string
+Parser::read_file(const std::string& path)
+{
     std::ifstream file(path, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Failed to open file: " + path);
@@ -24,13 +12,15 @@ std::string read_file(const std::string& path) {
     return buffer.str();
 }
 
-std::string get_node_text(const TSNode& node, const std::string& source) {
+std::string
+Parser::get_node_text(const TSNode& node, const std::string& source) {
     uint32_t start = ts_node_start_byte(node);
     uint32_t end = ts_node_end_byte(node);
     return source.substr(start, end - start);
 }
 
-std::string get_base_name(const TSNode& node, const std::string& source) {
+std::string
+Parser::get_base_name(const TSNode& node, const std::string& source) {
     std::string type = ts_node_type(node);
     if (type == "identifier" || type == "field_identifier") {
         return get_node_text(node, source);
@@ -64,7 +54,8 @@ std::string get_base_name(const TSNode& node, const std::string& source) {
     return "";
 }
 
-std::string get_fully_qualified_name(const TSNode& def_node, const std::string& source) {
+std::string
+Parser::get_fully_qualified_name(const TSNode& def_node, const std::string& source) {
     std::string base_name = "";
     TSNode name_node = def_node;
     TSNode declarator = ts_node_child_by_field_name(def_node, "declarator", 10);
@@ -112,7 +103,8 @@ std::string get_fully_qualified_name(const TSNode& def_node, const std::string& 
     return fq_name;
 }
 
-void collect_function_definitions(const TSNode& node, std::vector<TSNode>& definitions) {
+void
+Parser::collect_function_definitions(const TSNode& node, std::vector<TSNode>& definitions) {
     std::string type = ts_node_type(node);
     if (type == "function_definition") {
         definitions.push_back(node);
@@ -124,7 +116,8 @@ void collect_function_definitions(const TSNode& node, std::vector<TSNode>& defin
     }
 }
 
-void find_calls(const TSNode& node, const std::string& source, std::unordered_set<std::string>& calls) {
+void
+Parser::find_calls(const TSNode& node, const std::string& source, std::unordered_set<std::string>& calls) {
     std::string node_type = ts_node_type(node);
     if (node_type == "call_expression") {
         TSNode function = ts_node_child_by_field_name(node, "function", 8);
@@ -143,7 +136,8 @@ void find_calls(const TSNode& node, const std::string& source, std::unordered_se
     }
 }
 
-void process_file(const std::string& path, std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
+void
+Parser::process_file(const std::string& path, std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
     std::string source = read_file(path);
     TSParser* parser = ts_parser_new();
     ts_parser_set_language(parser, tree_sitter_cpp());
@@ -171,7 +165,8 @@ void process_file(const std::string& path, std::unordered_map<std::string, std::
     ts_parser_delete(parser);
 }
 
-void traverse_directory(const std::filesystem::path& dir, std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
+void
+Parser::traverse_directory(const std::filesystem::path& dir, std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
     for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
         if (entry.is_regular_file()) {
             std::string ext = entry.path().extension().string();
@@ -186,7 +181,8 @@ void traverse_directory(const std::filesystem::path& dir, std::unordered_map<std
     }
 }
 
-void print_call_graph(const std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
+void
+Parser::print_call_graph(const std::unordered_map<std::string, std::vector<std::string>>& call_graph) {
     for (const auto& [func, calls] : call_graph) {
         std::cout << func << " calls:";
         std::vector<std::string> sorted_calls = calls;
@@ -196,73 +192,4 @@ void print_call_graph(const std::unordered_map<std::string, std::vector<std::str
         }
         std::cout << std::endl;
     }
-}
-
-void generate_dot_file(const std::unordered_map<std::string, std::vector<std::string>>& call_graph, const std::string& dot_filename) {
-    std::ofstream dot_file(dot_filename);
-    if (!dot_file) {
-        std::cerr << "Error opening " << dot_filename << std::endl;
-        return;
-    }
-
-    dot_file << "digraph CallGraph {" << std::endl;
-    dot_file << "    node [shape=box, style=filled, fillcolor=lightblue];" << std::endl;
-
-    auto escape_dot_label = [](const std::string& label) -> std::string {
-        std::string escaped = label;
-        std::replace(escaped.begin(), escaped.end(), ':', '_');
-        std::replace(escaped.begin(), escaped.end(), '<', '_');
-        std::replace(escaped.begin(), escaped.end(), '>', '_');
-        std::replace(escaped.begin(), escaped.end(), ' ', '_');
-        return escaped;
-    };
-
-    for (const auto& [func, calls] : call_graph) {
-        std::string from = escape_dot_label(func);
-        for (const auto& call : calls) {
-            std::string to = escape_dot_label(call);
-            dot_file << "    \"" << from << "\" -> \"" << to << "\";" << std::endl;
-        }
-    }
-
-    dot_file << "}" << std::endl;
-    dot_file.close();
-    std::cout << "Generated DOT file: " << dot_filename << std::endl;
-}
-
-void render_graph(const std::string& dot_filename, const std::string& output_filename) {
-    std::string command = "dot -Tpng " + dot_filename + " -o " + output_filename;
-    int result = std::system(command.c_str());
-    if (result == 0) {
-        std::cout << "Rendered graph to: " << output_filename << std::endl;
-    } else {
-        std::cerr << "Error rendering graph. Make sure GraphViz is installed and 'dot' is in your PATH." << std::endl;
-    }
-}
-
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <path_to_directory>" << std::endl;
-        return 1;
-    }
-
-    Parser code_parser;
-    //Generator dot_generator;
-
-    std::string path = argv[1];
-    try {
-        std::unordered_map<std::string, std::vector<std::string>> call_graph;
-        traverse_directory(path, call_graph);
-        print_call_graph(call_graph);
-
-        std::string dot_filename = "call_graph.dot";
-        std::string output_filename = "call_graph.png";
-        generate_dot_file(call_graph, dot_filename);
-        render_graph(dot_filename, output_filename);
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
-    
-    return 0;
 }
