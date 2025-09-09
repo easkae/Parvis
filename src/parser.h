@@ -11,22 +11,20 @@
 #include <stack>
 #include <algorithm>
 #include <cstdlib>
+#include <memory>
 
-extern "C" const TSLanguage* tree_sitter_cpp();
+#include "language_handler.h"
 
 class Parser {
+private:
+    std::unique_ptr<LanguageHandler> handler;
+
 public:
+    Parser(const std::string& language);
+
     std::string read_file(const std::string& path);
 
-    std::string get_node_text(const TSNode& node, const std::string& source);
-
-    std::string get_base_name(const TSNode& node, const std::string& source);
-
-    std::string get_fully_qualified_name(const TSNode& def_node, const std::string& source);
-
-    void collect_function_definitions(const TSNode& node, std::vector<TSNode>& definitions);
-
-    void find_calls(const TSNode& node, const std::string& source, std::unordered_set<std::string>& calls);
+    static std::string get_node_text(const TSNode& node, const std::string& source);
 
     void process_file(const std::string& path, std::unordered_map<std::string, std::vector<std::string>>& call_graph);
 

@@ -19,21 +19,31 @@ add_library(tree-sitter-cpp-grammar STATIC
 )
 
 target_include_directories(tree-sitter-cpp-grammar PUBLIC
-	gramars/tree-sitter-cpp/src
+	grammars/tree-sitter-cpp/src
+)
+
+add_library(tree-sitter-python-grammar STATIC
+	grammars/tree-sitter-python/src/parser.c
+	grammars/tree-sitter-python/src/scanner.cc
+)
+
+target_include_directories(tree-sitter-python-grammar PUBLIC
+	grammars/tree-sitter-python/src
 )
 
 file(GLOB SOURCES "src/*.cpp")
 file(GLOB HEADERS "src/*.h")
 
-add_executable(${PROJECT_NAME} ${SOURCES} ${headers})
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	tree-sitter-core
 	tree-sitter-cpp-grammar
+	tree-sitter-python-grammar
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	lib/tree-sitter/lib/include
 	grammars/tree-sitter-cpp/src
+	grammars/tree-sitter-python/src
 )
-
