@@ -22,7 +22,10 @@ target_include_directories(tree-sitter-cpp-grammar PUBLIC
 	gramars/tree-sitter-cpp/src
 )
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+file(GLOB SOURCES "src/*.cpp")
+file(GLOB HEADERS "src/*.h")
+
+add_executable(${PROJECT_NAME} ${SOURCES} ${headers})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	tree-sitter-core
