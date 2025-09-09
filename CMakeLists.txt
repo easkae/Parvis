@@ -24,7 +24,7 @@ target_include_directories(tree-sitter-cpp-grammar PUBLIC
 
 add_library(tree-sitter-python-grammar STATIC
 	grammars/tree-sitter-python/src/parser.c
-	grammars/tree-sitter-python/src/scanner.cc
+	grammars/tree-sitter-python/src/scanner.c
 )
 
 target_include_directories(tree-sitter-python-grammar PUBLIC
